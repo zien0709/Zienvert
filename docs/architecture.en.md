@@ -739,6 +739,3 @@ Only **one** of these packages may be installed per environment:
 > **The zero-dependency rule:** Any module marked ❌ for both "Imports UI?" and "Imports Engine?" can be unit-tested in a plain Python environment with no display server — a key requirement for CI pipelines and headless server deployment via CLI.
 
 ---
-
-*Generated for `zien0709/ultra_station` · docs/architecture.md*  
-*To render Mermaid diagrams: GitHub natively renders `.md` files with Mermaid fences.*
