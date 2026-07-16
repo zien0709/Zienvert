@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zienvert - 極簡、高效的萬用格式轉換工具</title>
+    <!-- 引入 marked.js 解析 Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -305,29 +307,125 @@
             margin-bottom: 30px;
         }
 
-        .changelog h4 {
+        .changelog-title {
             font-size: 18px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
             color: var(--accent-primary);
         }
 
-        .changelog ul {
-            list-style-type: none;
-        }
-
-        .changelog li {
-            position: relative;
-            padding-left: 20px;
-            margin-bottom: 10px;
+        /* Markdown 渲染內容樣式 */
+        .changelog-content {
             color: var(--text-muted);
             font-size: 15px;
+            line-height: 1.6;
+        }
+        
+        .changelog-content h1, 
+        .changelog-content h2, 
+        .changelog-content h3, 
+        .changelog-content h4, 
+        .changelog-content h5, 
+        .changelog-content h6 {
+            color: var(--accent-primary);
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-weight: 600;
         }
 
-        .changelog li::before {
+        .changelog-content h1 { font-size: 1.5em; }
+        .changelog-content h2 { font-size: 1.3em; }
+        .changelog-content h3 { font-size: 1.1em; }
+        
+        .changelog-content p {
+            margin-bottom: 12px;
+        }
+
+        .changelog-content a {
+            color: var(--accent-primary);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: all 0.3s ease;
+            word-break: break-all;
+        }
+
+        .changelog-content a:hover {
+            border-bottom-color: var(--accent-primary);
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+        }
+
+        .changelog-content ul, 
+        .changelog-content ol {
+            margin-bottom: 16px;
+            padding-left: 20px;
+        }
+
+        .changelog-content ul li {
+            list-style: none;
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .changelog-content ul li::before {
             content: "✦";
             position: absolute;
-            left: 0;
+            left: -20px;
             color: var(--accent-secondary);
+        }
+
+        .changelog-content ol li {
+            margin-bottom: 8px;
+        }
+
+        .changelog-content strong, 
+        .changelog-content b {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .changelog-content code {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            color: var(--accent-secondary);
+        }
+
+        .changelog-content pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .changelog-content pre code {
+            background: transparent;
+            padding: 0;
+            color: var(--text-main);
+        }
+
+        .changelog-content blockquote {
+            border-left: 4px solid var(--accent-secondary);
+            margin-bottom: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 8px 16px;
+            border-radius: 0 8px 8px 0;
+            color: var(--text-muted);
+        }
+
+        .changelog-content img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 12px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .changelog-content del {
+            color: var(--text-muted);
+            text-decoration: line-through;
+            opacity: 0.6;
         }
 
         /* 動態生成的安裝檔網格 */
@@ -473,10 +571,11 @@
                 </div>
 
                 <div class="changelog">
-                    <h4>✨ 本次更新日誌</h4>
-                    <ul id="changelog-list">
-                        <li>正在從 GitHub 安全地載入更新說明...</li>
-                    </ul>
+                    <h4 class="changelog-title">✨ 本次更新日誌</h4>
+                    <!-- 這裡的內容將由 marked.js 解析後填入 -->
+                    <div id="changelog-content" class="changelog-content">
+                        <p>正在從 GitHub 安全地載入更新說明...</p>
+                    </div>
                 </div>
 
                 <h4 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: var(--text-main);">📦 選擇適用於您平台的安裝檔：</h4>
@@ -503,20 +602,11 @@
         const REPO = "zien0709/Zienvert";
         const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
 
-        // 簡單偵測使用者 OS 類型
-        function detectOS() {
-            const userAgent = navigator.userAgent.toLowerCase();
-            if (userAgent.includes("win")) return "windows";
-            if (userAgent.includes("mac")) return "macos";
-            if (userAgent.includes("linux")) return "linux";
-            return "unknown";
-        }
-
         async function fetchLatestRelease() {
             const heroBadge = document.getElementById("hero-badge");
             const releaseTagDisplay = document.getElementById("release-tag-display");
             const releaseDate = document.getElementById("release-date");
-            const changelogList = document.getElementById("changelog-list");
+            const changelogContent = document.getElementById("changelog-content");
             const assetsContainer = document.getElementById("assets-container");
             const sourceZip = document.getElementById("source-zip");
 
@@ -540,63 +630,48 @@
                     sourceZip.href = data.zipball_url;
                 }
 
-                // 2. 解析並繪製 Changelog
-                changelogList.innerHTML = "";
+                // 2. 解析並繪製 Changelog (使用 Marked.js)
                 if (data.body) {
-                    const lines = data.body.split('\n');
-                    let hasItem = false;
-                    lines.forEach(line => {
-                        const trimmed = line.trim();
-                        // 簡單解析 markdown 的清單符號
-                        if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
-                            const li = document.createElement('li');
-                            li.textContent = trimmed.substring(1).trim();
-                            changelogList.appendChild(li);
-                            hasItem = true;
-                        } else if (trimmed.startsWith('###')) {
-                            const h5 = document.createElement('h5');
-                            h5.style.color = 'var(--accent-primary)';
-                            h5.style.marginTop = '16px';
-                            h5.style.marginBottom = '6px';
-                            h5.textContent = trimmed.substring(3).trim();
-                            changelogList.appendChild(h5);
-                        } else if (trimmed && !trimmed.startsWith('#')) {
-                            const p = document.createElement('p');
-                            p.style.color = 'var(--text-muted)';
-                            p.style.fontSize = '14px';
-                            p.style.marginBottom = '6px';
-                            p.textContent = trimmed;
-                            changelogList.appendChild(p);
-                            hasItem = true;
-                        }
+                    // 自訂 renderer 讓所有連結都在新分頁開啟
+                    const renderer = new marked.Renderer();
+                    renderer.link = function(href, title, text) {
+                        return `<a target="_blank" rel="noopener noreferrer" href="${href}" title="${title || ''}">${text}</a>`;
+                    };
+                    
+                    marked.setOptions({
+                        renderer: renderer,
+                        breaks: true, // 允許一般換行符號轉為 <br>
+                        gfm: true     // 支援 GitHub 風格的 Markdown
                     });
-                    if (!hasItem) {
-                        changelogList.innerHTML = "<li>點擊下方按鈕前往 GitHub 查看詳細更新紀錄。</li>";
-                    }
+
+                    // 解析並套用
+                    changelogContent.innerHTML = marked.parse(data.body);
                 } else {
-                    changelogList.innerHTML = "<li>此版本未包含書面更新說明。</li>";
+                    changelogContent.innerHTML = "<p>此版本未包含書面更新說明。</p>";
                 }
 
                 // 3. 獲取安裝檔並渲染下載按鈕
                 assetsContainer.innerHTML = "";
-                const userOS = detectOS();
 
                 if (data.assets && data.assets.length > 0) {
                     data.assets.forEach(asset => {
                         const fileExtension = asset.name.split('.').pop().toLowerCase();
+                        const fileNameLower = asset.name.toLowerCase();
                         let isRecommended = false;
                         let platformBadge = "通用檔案";
 
-                        // 判斷該檔案是否符合當前使用者的作業系統，並給予高亮
+                        // 針對 Windows 與 Python 檔案客製化判斷
                         if (fileExtension === 'exe') {
-                            platformBadge = "Windows 安裝程式";
-                            if (userOS === 'windows') isRecommended = true;
-                        } else if (['dmg', 'pkg'].includes(fileExtension)) {
-                            platformBadge = "macOS 安裝套件";
-                            if (userOS === 'macos') isRecommended = true;
-                        } else if (['appimage', 'deb', 'rpm'].includes(fileExtension)) {
-                            platformBadge = "Linux 安裝程式";
-                            if (userOS === 'linux') isRecommended = true;
+                            platformBadge = "Windows 免安裝版 (推薦)";
+                            isRecommended = true; // 預設推薦 exe
+                        } else if (fileExtension === 'msix') {
+                            if (fileNameLower.includes('signed')) {
+                                platformBadge = "Windows MSIX (微軟已簽署)";
+                            } else {
+                                platformBadge = "Windows MSIX (未簽署)";
+                            }
+                        } else if (fileExtension === 'py') {
+                            platformBadge = "Python 獨立原始碼";
                         } else if (['zip', 'gz', 'rar'].includes(fileExtension)) {
                             platformBadge = "壓縮檔 / 便攜版";
                         }
@@ -642,18 +717,51 @@
                 heroBadge.textContent = "最新穩定版";
                 releaseTagDisplay.textContent = "Tag: Latest Release";
                 releaseDate.innerHTML = "發布狀態：<strong>Stable / 穩定版</strong>";
-                changelogList.innerHTML = `
-                    <li>優化底層核心轉換邏輯，轉換效率顯著提升。</li>
-                    <li>全新極簡現代感黑魂介面設計，更直覺、更流暢的操作體驗。</li>
-                    <li>修復已知排版與特定格式相容性問題。</li>
-                    <li>減少系統記憶體佔用，大幅提升多檔批次處理時的穩定度。</li>
+                
+                // 使用你提供的更新日誌作為後備顯示
+                changelogContent.innerHTML = `
+                    <h3 style="color: var(--accent-primary); margin-top: 10px; margin-bottom: 10px; font-weight: 600;">📦 本次發布格式</h3>
+                    <p style="margin-bottom: 12px;">為了滿足不同的使用情境與開發需求，本版本提供以下三種封裝格式下載：</p>
+                    <ul style="margin-bottom: 16px; padding-left: 20px;">
+                        <li style="margin-bottom: 8px;"><strong><code>.exe</code> 免安裝版（推薦）</strong>：完全無須安裝，下載後直接雙擊即可執行，體驗最即時順暢。</li>
+                        <li style="margin-bottom: 8px;"><strong><code>.msix</code> 封裝版</strong>：採用全新微軟封裝格式。<del style="color: var(--text-muted); opacity: 0.6;">（*請注意：此版本目前尚未進行數位簽署*）</del> 現已推出官方微軟簽署版（<code>zienstudio.convertultrazconvert_ms_signed.msix</code>），可直接雙擊安全安裝。</li>
+                        <li style="margin-bottom: 8px;"><strong><code>.py</code> 獨立原始碼</strong>：提供單一 Python 原始碼檔案，方便開發者自行審查與客製化。</li>
+                    </ul>
+                    <blockquote style="border-left: 4px solid var(--accent-secondary); margin-bottom: 16px; background: rgba(255, 255, 255, 0.03); padding: 8px 16px; border-radius: 0 8px 8px 0;">
+                        <p style="margin-bottom: 0;">💡 <strong><code>.msix</code> 安裝提示</strong><br>
+                        <del style="color: var(--text-muted); opacity: 0.6;">由於此 MSIX 套件目前處於<strong>未簽署</strong>狀態，若要在 Windows 10/11 系統上直接雙擊安裝，需要先開啟系統的「開發者模式」，或自行匯入憑證方可相容。</del><br>
+                        一般用戶建議優先下載 <code>.exe</code> 免安裝版或全新推出的微軟簽署版。</p>
+                    </blockquote>
                 `;
+                
+                // 靜態模擬 4 個按鈕
                 assetsContainer.innerHTML = `
                     <a href="https://github.com/zien0709/Zienvert/releases/latest" class="btn-primary asset-btn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                         <div class="details">
-                            <span class="filename">前往官方下載頁面</span>
-                            <span class="filesize" style="color: rgba(11, 15, 25, 0.7);">直接在 GitHub 下載最新版本</span>
+                            <span class="filename">Zienvert.exe</span>
+                            <span class="filesize" style="color: rgba(11, 15, 25, 0.7);">Windows 免安裝版 (推薦) • 直接下載</span>
+                        </div>
+                    </a>
+                    <a href="https://github.com/zien0709/Zienvert/releases/latest" class="btn-secondary asset-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        <div class="details">
+                            <span class="filename">ZienStudio.ConvertUltraZConvert_MS_Signed.msix</span>
+                            <span class="filesize">Windows MSIX (微軟已簽署) • 安全安裝</span>
+                        </div>
+                    </a>
+                    <a href="https://github.com/zien0709/Zienvert/releases/latest" class="btn-secondary asset-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        <div class="details">
+                            <span class="filename">Zienvert_Unsigned.msix</span>
+                            <span class="filesize">Windows MSIX (未簽署) • 開發者模式</span>
+                        </div>
+                    </a>
+                    <a href="https://github.com/zien0709/Zienvert/releases/latest" class="btn-secondary asset-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        <div class="details">
+                            <span class="filename">Zienvert.py</span>
+                            <span class="filesize">Python 獨立原始碼 • 單一檔案</span>
                         </div>
                     </a>
                 `;
