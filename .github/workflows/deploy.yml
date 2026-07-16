@@ -5,8 +5,8 @@ on:
     branches:
       - main # 當 main 分支有程式碼推入時觸發
     paths:
-      - 'docs/DownloadPage.html' # 只有當此檔案有變動時才觸發，省去不必要的執行時間
-
+      - 'docs/DownloadPage.html'
+  workflow_dispatch:
 permissions:
   contents: read
   pages: write
