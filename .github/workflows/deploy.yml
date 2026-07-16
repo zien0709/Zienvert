@@ -1,0 +1,43 @@
+name: Deploy DownloadPage to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # 當 main 分支有程式碼推入時觸發
+    paths:
+      - 'docs/DownloadPage.html' # 只有當此檔案有變動時才觸發，省去不必要的執行時間
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 避免多個部署同時執行造成衝突
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 建立一個臨時資料夾並將網頁重新命名為 index.html (GitHub Pages 預設入口頁面)
+      - name: Prepare site files
+        run: |
+          mkdir _site
+          cp docs/DownloadPage.html _site/index.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
